@@ -63,7 +63,7 @@ $("#timeline-btn").click(function() {
                       $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
                         '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
                         '"><td style="vertical-align: middle;"></td><td class="feature-name">' +
-                         layer.feature.properties.title + '</td><span class="feature-sort-name">'+layer.feature.properties.title_article_split+'</span><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
+                         layer.feature.properties.title + '</td><td style="display:none;" class="feature-sort-name">'+layer.feature.properties.title_article_split+'</td><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
                       newspaperSearch.push({
                         name: layer.feature.properties.title,
                         source: "Newspapers",
@@ -233,7 +233,7 @@ function syncSidebar() {
             $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
                 '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
                 '"><td style="vertical-align: middle;"><span class="fa fa-newspaper-o"/></td><td class="feature-name">' +
-                layer.feature.properties.title + '</td><span style="display:none;" class="feature-sort-name">'+layer.feature.properties.title_article_split+'</span><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
+                layer.feature.properties.title + '</td><td style="display:none;" class="feature-sort-name">'+layer.feature.properties.title_article_split+'</td><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
           }
         }
       });
