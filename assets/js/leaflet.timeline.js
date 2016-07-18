@@ -120,6 +120,9 @@
 	    if (geojson) {
 	      this._process(geojson);
 	    }
+	    if (options.markerClusterGroup){
+	    	this.markerClusterGroup = options.markerClusterGroup
+	    }
 	  },
 	  _getInterval: function _getInterval(feature) {
 	    return {
@@ -198,35 +201,56 @@
 	   * `drawOnSetTime` to `false`.
 	   */
 	  updateDisplayedLayers: function updateDisplayedLayers() {
-	    var _this3 = this;
-	
-	    // This loop is intended to help optimize things a bit. First, we find all
-	    // the features that should be displayed at the current time.
-	    var features = this.ranges.lookup(this.time);
-	    // Then we try to match each currently displayed layer up to a feature. If
-	    // we find a match, then we remove it from the feature list. If we don't
-	    // find a match, then the displayed layer is no longer valid at this time.
-	    // We should remove it.
-	    for (var i = 0; i < this.getLayers().length; i++) {
-	      var found = false;
-	      var layer = this.getLayers()[i];
-	      for (var j = 0; j < features.length; j++) {
-	        if (layer.feature === features[j]) {
-	          found = true;
-	          features.splice(j, 1);
-	          break;
-	        }
-	      }
-	      if (!found) {
-	        var toRemove = this.getLayers()[i--];
-	        this.removeLayer(toRemove);
-	      }
-	    }
-	    // Finally, with any features left, they must be new data! We can add them.
-	    features.forEach(function (feature) {
-	      return _this3.addData(feature);
-	    });
-	  }
+          //TODO use markerClusters
+          var _this3 = this;
+          var features = this.ranges.lookup(this.time);
+          var len;
+          if (this.markerClusterGroup){
+            len = this.markerClusterGroup.getLayers().length;
+          }
+          else {
+            len =  this.getLayers().length;
+          }
+          for (var i = 0; i < len; i++) {
+            var found = false;
+            var layer;
+            if (this.markerClusterGroup){
+              layer = this.markerClusterGroup.getLayers()[i];
+            }
+            else {
+              layer = this.getLayers()[i];
+            }
+            
+            for (var j = 0; j < features.length; j++) {
+              if (layer.feature === features[j]) {
+                found = true;
+                features.splice(j, 1);
+                break;
+              }
+            }
+            if (!found) {
+              var toRemove;
+              if (this.markerClusterGroup){
+                toRemove = this.markerClusterGroup.getLayers()[i--];
+                this.markerClusterGroup.removeLayer(toRemove);
+              }
+              else {
+                toRemove = this.getLayers()[i--];
+                this.removeLayer(toRemove);
+              }
+              
+            }
+          }
+          // Finally, with any features left, they must be new data! We can add them.
+          features.forEach(function (feature) {
+            return _this3.addData(feature);
+          });
+          
+          if (this.markerClusterGroup){
+          	this.markerClusterGroup.addLayer(this);
+            this.markerClusterGroup.refreshClusters();
+          }
+        }
 	});
 	
 	L.timeline = function (geojson, options) {
@@ -573,15 +597,17 @@
 	    var classes = ['leaflet-control-layers', 'leaflet-control-layers-expanded', 'leaflet-timeline-control'];
 	    var container = L.DomUtil.create('div', classes.join(' '));
 	    this.container = container;
+	    var sliderCtrlC = L.DomUtil.create('div', 'sldr-ctrl-container', container);
 	    if (this.options.enablePlayback) {
-	      var sliderCtrlC = L.DomUtil.create('div', 'sldr-ctrl-container', container);
+	      
 	      var buttonContainer = L.DomUtil.create('div', 'button-container', sliderCtrlC);
 	      this._makeButtons(buttonContainer);
 	      if (this.options.enableKeyboardControls) {
 	        this._addKeyListeners();
 	      }
-	      this._makeOutput(sliderCtrlC);
+	      
 	    }
+	    this._makeOutput(sliderCtrlC);
 	    this._makeSlider(container);
 	    if (this.options.showTicks) {
 	      this._buildDataList(container);

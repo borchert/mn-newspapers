@@ -30,9 +30,51 @@ $("#full-extent-btn").click(function() {
 });
 $("#timeline-btn").click(function() {
     if (!timeline_added){
-        map.removeLayer(markerClusters);
+        markerClusters.removeLayer(newspapers);
+
         timeline = L.timeline(newspapers_geojson, {
-            //drawOnSetTime: false,
+
+            onEachFeature: function (feature, layer) {
+                    if (feature.properties) {
+                      var content = "<table class='table table-striped table-bordered table-condensed'>" +
+                        "<tr><th>Name</th><td>" + feature.properties.title + "</td></tr>" +
+                        "<tr><th>Years</th><td>" + new Date(feature.properties.year_start).getUTCFullYear() + " - "+
+                        new Date(feature.properties.year_end).getUTCFullYear()+ "</td></tr>" +
+                        "<tr><th>URL</th><td style='word-break:break-word;'><a href="+feature.properties.url +">"+ feature.properties.url +
+                        "</a></td></tr>{kw}<table>";
+
+                        //only show headings row if there are some to show!
+                        if (feature.properties.subject_headings !== ""){
+                            content = content.replace("{kw}", "<tr><th>Keywords</th><td>" +
+                            feature.properties.subject_headings + "</td></tr>");
+                        }
+                        else {
+                            content = content.replace("{kw}","");
+                        }
+
+                      layer.on({
+                        click: function (e) {
+                          $("#feature-title").html(feature.properties.title);
+                          $("#feature-info").html(content);
+                          $("#featureModal").modal("show");
+                          highlight.clearLayers().addLayer(L.circleMarker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], highlightStyle));
+                        }
+                      });
+                      $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
+                        '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
+                        '"><td style="vertical-align: middle;"></td><td class="feature-name">' +
+                         layer.feature.properties.title + '</td><span class="feature-sort-name">'+layer.feature.properties.title_article_split+'</span><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
+                      newspaperSearch.push({
+                        name: layer.feature.properties.title,
+                        source: "Newspapers",
+                        id: L.stamp(layer),
+                        lat: layer.feature.geometry.coordinates[1],
+                        lng: layer.feature.geometry.coordinates[0]
+                      });
+                    }
+                  },
+            drawOnSetTime: false,
+            markerClusterGroup: markerClusters,
             getInterval: function(feature){
                 return {
                     "start": new Date(feature.properties.year_start),
@@ -40,67 +82,70 @@ $("#timeline-btn").click(function() {
                 };
             }
         });
+
         timeline.updateDisplayedLayers =  function updateDisplayedLayers() {
-          //TODO use markerClusters
           var _this3 = this;
           var features = this.ranges.lookup(this.time);
-          for (var i = 0; i < this.getLayers().length; i++) {
-            var found = false;
-            var layer = this.getLayers()[i];
-            for (var j = 0; j < features.length; j++) {
-              if (layer.feature === features[j]) {
-                found = true;
-                features.splice(j, 1);
-                break;
-              }
-            }
-            if (!found) {
-              var toRemove = this.getLayers()[i--];
-              this.removeLayer(toRemove);
-            }
-          }
-          // Finally, with any features left, they must be new data! We can add them.
+          this.clearLayers();
           features.forEach(function (feature) {
-            return _this3.addData(feature);
+            _this3.addData(feature);
           });
+          if (this.markerClusterGroup){
+            markerClusters.clearLayers();
+            _this3.markerClusterGroup.addLayers(_this3.getLayers());
+            this.markerClusterGroup.refreshClusters();
+          }
         }
+
         timeline_control = L.timelineSliderControl({
             formatOutput: function(date){
-              var d = moment(date).format("YYYY");
+              var d = new Date(date).getUTCFullYear();
               return d;
             },
             enablePlayback: false,
             waitToUpdateMap: true
         });
-        timeline.on("click", function(e){
-            var feature = e.layer.feature;
-            var content = "<table class='table table-striped table-bordered table-condensed'>" +
-              "<tr><th>Name</th><td>" + feature.properties.title + "</td></tr>" + "<tr><th>URL</th><td style='word-break:break-word;'><a href="+feature.properties.url +">"+ feature.properties.url +
-              "</a></td></tr>{kw}<table>";
 
-              //only show headings row if there are some to show!
-              if (feature.properties.subject_headings !== ""){
-                  content = content.replace("{kw}", "<tr><th>Keywords</th><td>" +
-                  feature.properties.subject_headings + "</td></tr>");
-              }
-              else {
-                  content = content.replace("{kw}","");
-              }
-            $("#feature-title").html(feature.properties.title);
-            $("#feature-info").html(content);
-            $("#featureModal").modal("show");
+        // timeline.on("click", function(e){
+        //     var feature = e.layer.feature;
+        //         var content = "<table class='table table-striped table-bordered table-condensed'>" +
+        //           "<tr><th>Name</th><td>" + feature.properties.title + "</td></tr>" +
+        //           "<tr><th>Years</th><td>" + moment(new Date(feature.properties.year_start)).format("YYYY") + " - "+
+        //           moment(new Date(feature.properties.year_end)).format("YYYY")+ "</td></tr>" +
+        //           "<tr><th>URL</th><td style='word-break:break-word;'><a href="+feature.properties.url +">"+ feature.properties.url +
+        //           "</a></td></tr>{kw}<table>";
+        //       //only show headings row if there are some to show!
+        //       if (feature.properties.subject_headings !== ""){
+        //           content = content.replace("{kw}", "<tr><th>Keywords</th><td>" +
+        //           feature.properties.subject_headings + "</td></tr>");
+        //       }
+        //       else {
+        //           content = content.replace("{kw}","");
+        //       }
+        //     $("#feature-title").html(feature.properties.title);
+        //     $("#feature-info").html(content);
+        //     $("#featureModal").loginModal("show");
+        // });
+
+        timeline.on("change", function(e){
+          this.updateDisplayedLayers();
+          syncSidebar();
         });
-        timeline.addTo(map);
+        map.addLayer(timelineLayer);
+        markerClusters.addLayer(timeline);
         timeline_control.addTo(map);
         timeline_control.addTimelines(timeline);
         timeline_added = true;
+        syncSidebar();
         return false;
     }
     else {
-        map.addLayer(markerClusters);
-        map.removeLayer(timeline);
+        markerClusters.removeLayer(timeline);
+        map.removeLayer(timelineLayer);
+        markerClusters.addLayer(newspapers);
         timeline_control.removeFrom(map);
         timeline_added = false;
+        syncSidebar();
     }
 
 });
@@ -168,16 +213,33 @@ function syncSidebar() {
   /* Empty sidebar features */
   $("#feature-list tbody").empty();
   /* Loop through theaters layer and add only features which are in the map bounds */
-  newspapers.eachLayer(function (layer) {
-    if (map.hasLayer(newspapersLayer)) {
-      if (map.getBounds().contains(layer.getLatLng())) {
-        $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
-            '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
-            '"><td style="vertical-align: middle;"><span class="fa fa-newspaper-o"/></td><td class="feature-name">' +
-            layer.feature.properties.title + '</td><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
-      }
+
+  if (!timeline_added){
+      newspapers.eachLayer(function (layer) {
+        if (map.hasLayer(newspapersLayer)) {
+          if (map.getBounds().contains(layer.getLatLng())) {
+            $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
+                '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
+                '"><td style="vertical-align: middle;"><span class="fa fa-newspaper-o"/></td><td class="feature-name">' +
+                layer.feature.properties.title + '</td><td style="display:none;" class="feature-sort-name">'+layer.feature.properties.title_article_split+'</td><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
+          }
+        }
+      });
+  }
+    else {
+         timeline.eachLayer(function (layer) {
+        if (map.hasLayer(timelineLayer)) {
+          if (map.getBounds().contains(layer.getLatLng())) {
+            $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
+                '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
+                '"><td style="vertical-align: middle;"><span class="fa fa-newspaper-o"/></td><td class="feature-name">' +
+                layer.feature.properties.title + '</td><span style="display:none;" class="feature-sort-name">'+layer.feature.properties.title_article_split+'</span><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
+          }
+        }
+      });
+
     }
-  });
+
   // /* Loop through museums layer and add only features which are in the map bounds */
   // museums.eachLayer(function (layer) {
   //   if (map.hasLayer(museumLayer)) {
@@ -188,11 +250,12 @@ function syncSidebar() {
   // });
   /* Update list.js featureList */
   featureList = new List("features", {
-    valueNames: ["feature-name"]
+    valueNames: ["feature-name", "feature-sort-name"]
   });
-  featureList.sort("feature-name", {
+  featureList.sort("feature-sort-name", {
     order: "asc"
   });
+
 }
 
 /* Basemap Layers */
@@ -313,6 +376,7 @@ carto_url = carto_url.replace("{username}", carto_user)
 
 /* Empty layer placeholder to add to layer control for listening when to add/remove newspapers to markerClusters layer */
 var newspapersLayer = L.geoJson(null);
+var timelineLayer = L.geoJson(null);
 var newspapers = L.geoJson(null, {
   pointToLayer: function (feature, latlng) {
     return L.marker(latlng, {
@@ -324,8 +388,8 @@ var newspapers = L.geoJson(null, {
     if (feature.properties) {
       var content = "<table class='table table-striped table-bordered table-condensed'>" +
         "<tr><th>Name</th><td>" + feature.properties.title + "</td></tr>" +
-        "<tr><th>Years</th><td>" + moment(new Date(feature.properties.year_start)).format("YYYY") + " - "+
-        moment(new Date(feature.properties.year_end)).format("YYYY")+ "</td></tr>" +
+        "<tr><th>Years</th><td>" + new Date(feature.properties.year_start).getUTCFullYear() + " - "+
+        new Date(feature.properties.year_end).getUTCFullYear()+ "</td></tr>" +
         "<tr><th>URL</th><td style='word-break:break-word;'><a href="+feature.properties.url +">"+ feature.properties.url +
         "</a></td></tr>{kw}<table>";
 
@@ -346,10 +410,15 @@ var newspapers = L.geoJson(null, {
           highlight.clearLayers().addLayer(L.circleMarker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], highlightStyle));
         }
       });
-      $("#feature-list tbody").append('<tr class="feature-row" id="' + L.stamp(layer) +
+
+      var fl = '<tr class="feature-row" ASDFASDFJAWERJASDKFJASFD data-sort-name="'+ layer.feature.properties.title_article_split+'" id="' + L.stamp(layer) +
         '" lat="' + layer.getLatLng().lat + '" lng="' + layer.getLatLng().lng +
         '"><td style="vertical-align: middle;"></td><td class="feature-name">' +
-         layer.feature.properties.title + '</td><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>');
+         layer.feature.properties.title + '</td><td style="visibility:hidden;" class="feature-sort-name">'+ 
+        layer.feature.properties.title_article_split +'</td><td style="vertical-align: middle;"><i class="fa fa-chevron-right pull-right"></i></td></tr>';
+
+      $("#feature-list tbody").append(fl);
+      
       newspaperSearch.push({
         name: layer.feature.properties.title,
         source: "Newspapers",
@@ -465,10 +534,10 @@ var attributionControl = L.control({
 });
 attributionControl.onAdd = function (map) {
   var div = L.DomUtil.create("div", "leaflet-control-attribution");
-  div.innerHTML = "<span class='hidden-xs'>Developed by <a href='http://bryanmcbride.com'>bryanmcbride.com</a> | </span><a href='#' onclick='$(\"#attributionModal\").modal(\"show\"); return false;'>Attribution</a>";
+  div.innerHTML = "<span class='hidden-xs'></a>";
   return div;
 };
-map.addControl(attributionControl);
+//map.addControl(attributionControl);
 
 var zoomControl = L.control.zoom({
   position: "bottomright"
@@ -551,8 +620,10 @@ $(document).one("ajaxStop", function () {
   sizeLayerControl();
   /* Fit map to boroughs bounds */
   //map.fitBounds(boroughs.getBounds());
-  featureList = new List("features", {valueNames: ["feature-name"]});
-  featureList.sort("feature-name", {order:"asc"});
+  featureList = new List("features", {valueNames: ["feature-name","feature-sort-name"]});
+  featureList.sort("feature-sort-name", {
+    order:"asc"
+});
 
   // var boroughsBH = new Bloodhound({
   //   name: "Boroughs",
